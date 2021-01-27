@@ -1,0 +1,27 @@
+select submission_date, sumvalid,a4.hacker_id,hackers.name
+from
+(select submission_date, hacker_id,sumvalid,
+        min(hacker_id) over (partition by submission_date order by hacker_id) as minid
+from
+(select submission_date, hacker_id,datediff,nsub, maxsub, subdate, dateid,validsub,
+       sum(validsub) over (partition by submission_date) as sumvalid
+from 
+    (select hacker_id, submission_date, datediff,nsub, maxsub, subdate, dateid,
+            case when subdate =dateid then 1
+            else 0 end as validsub 
+     from
+                (select submission_date, hacker_id, 
+                count(*) as nsub,
+                 submission_date - lag(submission_date) over (partition by hacker_id order by submission_date) as datediff,
+                 EXTRACT(DAY from submission_date) as subdate,
+                 ROW_NUMBER() over (partition by hacker_id order by submission_date) as dateid,
+                 max(count(*)) over (partition by submission_date) as maxsub
+                from submissions 
+                group by submission_date, hacker_id
+                order by submission_date, hacker_id) a1
+    )a2
+order by submission_date, hacker_id)a3
+where nsub=maxsub)a4
+join hackers on hackers.hacker_id=a4.hacker_id
+where a4.hacker_id=minid
+order by submission_date;
